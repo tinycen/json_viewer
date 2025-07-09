@@ -353,16 +353,25 @@ class _JsonTreeViewState extends State<JsonTreeView> {
                       value is Map ? '{...}' : '[...]',
                       style: const TextStyle(color: Colors.blueGrey, fontFamily: 'monospace'),
                     )
-                  : Text(
-                      value.toString(),
-                      style: const TextStyle(fontFamily: 'monospace'),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          value.toString(),
+                          style: const TextStyle(fontFamily: 'monospace'),
+                        ),
+                        if (comment != null && comment.isNotEmpty)
+                          Text(
+                            '  ( $comment )',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                            ),
+                          ),
+                      ],
                     ),
             ),
-            if (comment != null && comment.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.comment, size: 16, color: Colors.orange),
-              ),
           ],
         ),
       ),
