@@ -126,7 +126,20 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('JSON Viewer'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              filePath.isNotEmpty ? filePath.split(Platform.pathSeparator).last : 'JSON Viewer',
+              style: const TextStyle(fontSize: 20),
+            ),
+            if (filePath.isNotEmpty)
+              Text(
+                filePath,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.folder_open),
