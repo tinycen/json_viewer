@@ -7,12 +7,13 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 import 'package:flutter/foundation.dart';
 
-void main() {
-  runApp(const JsonViewerApp());
+void main(List<String> args) {
+  runApp(JsonViewerApp(startupArgs: args));
 }
 
 class JsonViewerApp extends StatelessWidget {
-  const JsonViewerApp({super.key});
+  final List<String> startupArgs;
+  const JsonViewerApp({super.key, this.startupArgs = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -21,13 +22,14 @@ class JsonViewerApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const JsonViewerPage(),
+      home: JsonViewerPage(startupArgs: startupArgs),
     );
   }
 }
 
 class JsonViewerPage extends StatefulWidget {
-  const JsonViewerPage({super.key});
+  final List<String> startupArgs;
+  const JsonViewerPage({super.key, this.startupArgs = const []});
 
   @override
   State<JsonViewerPage> createState() => _JsonViewerPageState();
@@ -40,6 +42,34 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   Set<String> selectedPaths = {}; // 存储 path.key 或 path.value
   String? lastSelectedKey;
   String? lastSelectedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.startupArgs.isNotEmpty) {
+      final file = widget.startupArgs.first;
+      if (file.endsWith('.json')) {
+        filePath = file;
+        _loadFileFromPath(filePath);
+      }
+    }
+  }
+
+  Future<void> _loadFileFromPath(String path) async {
+    try {
+      final file = File(path);
+      final contents = await file.readAsString();
+      setState(() {
+        jsonData = jsonDecode(contents);
+        selectedPaths.clear();
+      });
+      await _loadComments();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载失败: $e')),
+      );
+    }
+  }
 
   String _buildYamlPath(List<String> path) {
     return path.join('.');
