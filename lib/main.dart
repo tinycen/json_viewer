@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
+import 'package:flutter/foundation.dart';
 
 void main() {
   runApp(const JsonViewerApp());
@@ -36,7 +37,9 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   dynamic jsonData;
   String filePath = '';
   Map<String, String> comments = {};
-  Set<String> selectedPaths = {}; // 现在存储 path.key 或 path.value
+  Set<String> selectedPaths = {}; // 存储 path.key 或 path.value
+  String? lastSelectedKey;
+  String? lastSelectedValue;
 
   String _buildYamlPath(List<String> path) {
     return path.join('.');
@@ -124,60 +127,93 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              filePath.isNotEmpty ? filePath.split(Platform.pathSeparator).last : 'JSON Viewer',
-              style: const TextStyle(fontSize: 20),
-            ),
-            if (filePath.isNotEmpty)
+    return RawKeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKey: (RawKeyEvent event) {
+        if (event is RawKeyDownEvent) {
+          final isCtrlC = (event.isControlPressed || (defaultTargetPlatform == TargetPlatform.macOS && event.isMetaPressed)) && event.logicalKey.keyLabel.toLowerCase() == 'c';
+          if (isCtrlC) {
+            if (selectedPaths.isNotEmpty) {
+              final sel = selectedPaths.first;
+              if (sel.endsWith('.key') && lastSelectedKey != null && lastSelectedKey!.isNotEmpty) {
+                Clipboard.setData(ClipboardData(text: lastSelectedKey!));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制字段名')));
+              } else if (sel.endsWith('.value') && lastSelectedValue != null && lastSelectedValue!.isNotEmpty) {
+                Clipboard.setData(ClipboardData(text: lastSelectedValue!));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制字段值')));
+              }
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                filePath,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                filePath.isNotEmpty ? filePath.split(Platform.pathSeparator).last : 'JSON Viewer',
+                style: const TextStyle(fontSize: 20),
               ),
+              if (filePath.isNotEmpty)
+                Text(
+                  filePath,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.folder_open),
+              onPressed: openFile,
+              tooltip: '打开 JSON 文件',
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.folder_open),
-            onPressed: openFile,
-            tooltip: '打开 JSON 文件',
-          ),
-        ],
-      ),
-      body: jsonData == null
-          ? const Center(child: Text('未加载 JSON 文件'))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: JsonTreeView(
-                data: jsonData,
-                path: [],
-                comments: comments,
-                selectedPaths: selectedPaths,
-                onSelect: (String pathType) {
-                  setState(() {
-                    if (selectedPaths.contains(pathType)) {
-                      selectedPaths.remove(pathType);
-                    } else {
-                      selectedPaths.clear();
-                      selectedPaths.add(pathType);
-                    }
-                  });
-                },
-                onCopyPath: (String pythonPath) async {
-                  await Clipboard.setData(ClipboardData(text: pythonPath));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已复制 Python 路径')),
-                  );
-                },
-                onAddComment: (String yamlPath) async {
-                  await _showAddCommentDialog(context, yamlPath);
-                },
+        body: jsonData == null
+            ? const Center(child: Text('未加载 JSON 文件'))
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: JsonTreeView(
+                  data: jsonData,
+                  path: [],
+                  comments: comments,
+                  selectedPaths: selectedPaths,
+                  onSelect: (String pathType, String keyName, String? valueStr, bool isKey) {
+                    setState(() {
+                      if (selectedPaths.contains(pathType)) {
+                        selectedPaths.remove(pathType);
+                        if (isKey) {
+                          lastSelectedKey = null;
+                        } else {
+                          lastSelectedValue = null;
+                        }
+                      } else {
+                        selectedPaths.clear();
+                        selectedPaths.add(pathType);
+                        if (isKey) {
+                          lastSelectedKey = keyName;
+                          lastSelectedValue = null;
+                        } else {
+                          lastSelectedValue = valueStr;
+                          lastSelectedKey = null;
+                        }
+                      }
+                    });
+                  },
+                  onCopyPath: (String pythonPath) async {
+                    await Clipboard.setData(ClipboardData(text: pythonPath));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已复制 Python 路径')),
+                    );
+                  },
+                  onAddComment: (String yamlPath) async {
+                    await _showAddCommentDialog(context, yamlPath);
+                  },
+                ),
               ),
-            ),
+      ),
     );
   }
 }
@@ -187,7 +223,7 @@ class JsonTreeView extends StatefulWidget {
   final List<String> path;
   final Map<String, String> comments;
   final Set<String> selectedPaths;
-  final void Function(String pathType) onSelect;
+  final void Function(String pathType, String keyName, String? valueStr, bool isKey) onSelect;
   final void Function(String pythonPath) onCopyPath;
   final void Function(String yamlPath) onAddComment;
 
@@ -297,23 +333,14 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     final isValueSelected = widget.selectedPaths.contains('$yamlPath.value');
     final comment = widget.comments[yamlPath];
     
-    // 添加处理双击选择的方法
-    void handleDoubleTap(String selectionType) {
-      String pathToSelect;
-      if (selectionType == 'key') {
-        pathToSelect = '$yamlPath.key';
-      } else if (selectionType == 'value') {
-        pathToSelect = '$yamlPath.value';
-      } else {
-        pathToSelect = yamlPath;
-      }
-      widget.onSelect(pathToSelect);
+    void handleSelectKey() {
+      widget.onSelect('$yamlPath.key', key, null, true);
+    }
+    void handleSelectValue() {
+      widget.onSelect('$yamlPath.value', key, value?.toString(), false);
     }
 
-    return Container(
-      // 整行不再高亮
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-      child: Row(
+    Widget rowWidget = Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -333,13 +360,15 @@ class _JsonTreeViewState extends State<JsonTreeView> {
                   : const SizedBox(width: 16),
             ),
           if (!isEmpty) const SizedBox(width: 2),
-          // Key部分 - 可双击选择
+          // Key部分 - 可单击选择（右键菜单）
           GestureDetector(
-            onDoubleTap: () => handleDoubleTap('key'),
+            onTap: () {
+              handleSelectKey();
+            },
             onSecondaryTapDown: (details) async {
               if (!isKeySelected) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请先双击选中字段')),
+                  const SnackBar(content: Text('请先单击选中字段')),
                 );
                 return;
               }
@@ -377,11 +406,13 @@ class _JsonTreeViewState extends State<JsonTreeView> {
             ),
           ),
           const Text(': ', style: TextStyle(fontFamily: 'monospace')),
-          // Value部分 - 可双击选择
+          // Value部分 - 可单击选择
           Flexible(
             child: value is Map || value is List
                 ? GestureDetector(
-                    onDoubleTap: () => handleDoubleTap('value'),
+                    onTap: () {
+                      handleSelectValue();
+                    },
                     child: Container(
                       color: isValueSelected ? Colors.lightBlue.withOpacity(0.2) : null,
                       child: Text(
@@ -394,7 +425,9 @@ class _JsonTreeViewState extends State<JsonTreeView> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onDoubleTap: () => handleDoubleTap('value'),
+                        onTap: () {
+                          handleSelectValue();
+                        },
                         child: Container(
                           color: isValueSelected ? Colors.lightBlue.withOpacity(0.2) : null,
                           child: Text(
@@ -416,7 +449,8 @@ class _JsonTreeViewState extends State<JsonTreeView> {
                   ),
           ),
         ],
-      ),
-    );
+      );
+
+    return rowWidget;
   }
 }
