@@ -36,7 +36,7 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   dynamic jsonData;
   String filePath = '';
   Map<String, String> comments = {};
-  Set<String> selectedPaths = {};
+  Set<String> selectedPaths = {}; // 现在存储 path.key 或 path.value
 
   String _buildYamlPath(List<String> path) {
     return path.join('.');
@@ -157,13 +157,13 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
                 path: [],
                 comments: comments,
                 selectedPaths: selectedPaths,
-                onSelect: (String path) {
+                onSelect: (String pathType) {
                   setState(() {
-                    if (selectedPaths.contains(path)) {
-                      selectedPaths.remove(path);
+                    if (selectedPaths.contains(pathType)) {
+                      selectedPaths.remove(pathType);
                     } else {
                       selectedPaths.clear();
-                      selectedPaths.add(path);
+                      selectedPaths.add(pathType);
                     }
                   });
                 },
@@ -187,7 +187,7 @@ class JsonTreeView extends StatefulWidget {
   final List<String> path;
   final Map<String, String> comments;
   final Set<String> selectedPaths;
-  final void Function(String path) onSelect;
+  final void Function(String pathType) onSelect;
   final void Function(String pythonPath) onCopyPath;
   final void Function(String yamlPath) onAddComment;
 
@@ -293,100 +293,129 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   Widget _buildFieldRow(BuildContext context, String key, dynamic value, List<String> path, {bool isEmpty = false}) {
     final yamlPath = _buildYamlPath(path);
     final pythonPath = _buildPythonPath(path);
-    final isSelected = widget.selectedPaths.contains(yamlPath);
+    final isKeySelected = widget.selectedPaths.contains('$yamlPath.key');
+    final isValueSelected = widget.selectedPaths.contains('$yamlPath.value');
     final comment = widget.comments[yamlPath];
-    return GestureDetector(
-      onDoubleTap: () {
-        widget.onSelect(yamlPath);
-      },
-      onSecondaryTapDown: (details) async {
-        if (!isSelected) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先双击选中字段')), // 右键前需双击
-          );
-          return;
-        }
-        final selected = await showMenu<String>(
-          context: context,
-          position: RelativeRect.fromLTRB(
-            details.globalPosition.dx,
-            details.globalPosition.dy,
-            details.globalPosition.dx,
-            details.globalPosition.dy,
-          ),
-          items: [
-            const PopupMenuItem(
-              value: 'copy',
-              child: Text('复制 Python 路径'),
-            ),
-            const PopupMenuItem(
-              value: 'comment',
-              child: Text('添加/编辑注释'),
-            ),
-          ],
-        );
-        if (selected == 'copy') {
-          widget.onCopyPath(pythonPath);
-        } else if (selected == 'comment') {
-          widget.onAddComment(yamlPath);
-        }
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        color: isSelected ? Colors.lightBlue.withOpacity(0.2) : null,
-        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isEmpty)
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    expanded = !expanded;
-                  });
-                },
-                child: value is Map || value is List
-                    ? Icon(
-                        expanded ? Icons.expand_more : Icons.chevron_right,
-                        size: 16,
-                        color: Colors.blueGrey,
-                      )
-                    : const SizedBox(width: 16),
-              ),
-            if (!isEmpty) const SizedBox(width: 2),
-            Text(
-              key,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-            ),
-            const Text(': ', style: TextStyle(fontFamily: 'monospace')),
-            Flexible(
+    
+    // 添加处理双击选择的方法
+    void handleDoubleTap(String selectionType) {
+      String pathToSelect;
+      if (selectionType == 'key') {
+        pathToSelect = '$yamlPath.key';
+      } else if (selectionType == 'value') {
+        pathToSelect = '$yamlPath.value';
+      } else {
+        pathToSelect = yamlPath;
+      }
+      widget.onSelect(pathToSelect);
+    }
+
+    return Container(
+      // 整行不再高亮
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isEmpty)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  expanded = !expanded;
+                });
+              },
               child: value is Map || value is List
-                  ? Text(
-                      value is Map ? '{...}' : '[...]',
-                      style: const TextStyle(color: Colors.blueGrey, fontFamily: 'monospace'),
+                  ? Icon(
+                      expanded ? Icons.expand_more : Icons.chevron_right,
+                      size: 16,
+                      color: Colors.blueGrey,
                     )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          value.toString(),
-                          style: const TextStyle(fontFamily: 'monospace'),
-                        ),
-                        if (comment != null && comment.isNotEmpty)
-                          Text(
-                            '  ( $comment )',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontStyle: FontStyle.italic,
-                              fontSize: 13,
-                            ),
-                          ),
-                      ],
-                    ),
+                  : const SizedBox(width: 16),
             ),
-          ],
-        ),
+          if (!isEmpty) const SizedBox(width: 2),
+          // Key部分 - 可双击选择
+          GestureDetector(
+            onDoubleTap: () => handleDoubleTap('key'),
+            onSecondaryTapDown: (details) async {
+              if (!isKeySelected) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请先双击选中字段')),
+                );
+                return;
+              }
+              final selected = await showMenu<String>(
+                context: context,
+                position: RelativeRect.fromLTRB(
+                  details.globalPosition.dx,
+                  details.globalPosition.dy,
+                  details.globalPosition.dx,
+                  details.globalPosition.dy,
+                ),
+                items: [
+                  const PopupMenuItem(
+                    value: 'copy',
+                    child: Text('复制 Python 路径'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'comment',
+                    child: Text('添加/编辑注释'),
+                  ),
+                ],
+              );
+              if (selected == 'copy') {
+                widget.onCopyPath(pythonPath);
+              } else if (selected == 'comment') {
+                widget.onAddComment(yamlPath);
+              }
+            },
+            child: Container(
+              color: isKeySelected ? Colors.lightBlue.withOpacity(0.2) : null,
+              child: Text(
+                key,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+          const Text(': ', style: TextStyle(fontFamily: 'monospace')),
+          // Value部分 - 可双击选择
+          Flexible(
+            child: value is Map || value is List
+                ? GestureDetector(
+                    onDoubleTap: () => handleDoubleTap('value'),
+                    child: Container(
+                      color: isValueSelected ? Colors.lightBlue.withOpacity(0.2) : null,
+                      child: Text(
+                        value is Map ? '{...}' : '[...]',
+                        style: const TextStyle(color: Colors.blueGrey, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onDoubleTap: () => handleDoubleTap('value'),
+                        child: Container(
+                          color: isValueSelected ? Colors.lightBlue.withOpacity(0.2) : null,
+                          child: Text(
+                            value.toString(),
+                            style: const TextStyle(fontFamily: 'monospace'),
+                          ),
+                        ),
+                      ),
+                      if (comment != null && comment.isNotEmpty)
+                        Text(
+                          '  ( $comment )',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                            fontSize: 13,
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
   }
