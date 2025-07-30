@@ -8,7 +8,7 @@ A cross-platform Flutter application for viewing, navigating, and annotating JSO
 - **2. Field Operations**: Double-click to select fields, right-click for context menu actions
 - **3. Path Copying**: Copy Python-style access paths for any field (e.g., `['key1']['key2']`)
 - **4. Annotation System**: Add, edit, and save comments for any field (comments saved as YAML)
-- **5. JSON Compression**: Automatically compress long JSON data for better readability
+- **5. JSON Compression**: Automatically compress long JSON data for better readability and to reduce Token usage when copying to ChatGPT-like applications.
 - **6. Cross-platform**: Windows, macOS, Linux, Web, Android, iOS
 
 ## Usage
