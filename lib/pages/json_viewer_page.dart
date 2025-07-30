@@ -7,6 +7,7 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 import 'package:flutter/foundation.dart';
 import '../widgets/json_tree_view.dart';
+import '../widgets/json_compressor.dart';
 
 class JsonViewerPage extends StatefulWidget {
   final List<String> startupArgs;
@@ -139,56 +140,20 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
     }
   }
 
-  dynamic _compressJsonData(dynamic data) {
-    if (data is String) {
-      if (data.length > 10) {
-        return data.substring(0, 10) + '...';
-      }
-      return data;
-    } else if (data is List) {
-      if (data.length > 2) {
-        return [
-          if (data.length > 0) _compressJsonData(data[0]),
-          if (data.length > 1) _compressJsonData(data[1]),
-        ];
-      }
-      return data.map((item) => _compressJsonData(item)).toList();
-    } else if (data is Map) {
-      final compressedMap = <String, dynamic>{};
-      int count = 0;
-      data.forEach((key, value) {
-        if (count < 2) {
-          compressedMap[key] = _compressJsonData(value);
-          count++;
-        }
-      });
-      return compressedMap;
-    }
-    return data;
-  }
-
+  // 删除原有的_compressJsonData方法
+  // 修改保存压缩文件方法
   Future<void> _saveCompressedFile() async {
     if (jsonData == null) return;
-    
-    final compressedData = _compressJsonData(jsonData);
-    final jsonString = jsonEncode(compressedData);
-    
-    final file = File(filePath);
-    final directory = file.parent;
-    final nameWithoutExtension = file.uri.pathSegments.lastWhere((segment) => segment.contains('.')).split('.').first;
-    final newPath = '${directory.path}${Platform.pathSeparator}${nameWithoutExtension}_compressed.json';
-    
-    try {
-      final newFile = File(newPath);
-      await newFile.writeAsString(jsonString);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('压缩文件已保存到: $newPath')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: $e')),
-      );
+
+    final newPath = await JsonCompressor.saveCompressedFile(filePath, jsonData);
+    if (newPath != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('压缩文件已保存到: $newPath')));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('保存失败: 处理文件时出错')));
     }
   }
 
@@ -199,23 +164,23 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
       autofocus: true,
       onKey: (RawKeyEvent event) {
         if (event is RawKeyDownEvent) {
-          final isCtrlC = 
-              (event.isControlPressed || 
-                  (defaultTargetPlatform == TargetPlatform.macOS && 
-                      event.isMetaPressed)) && 
+          final isCtrlC =
+              (event.isControlPressed ||
+                  (defaultTargetPlatform == TargetPlatform.macOS &&
+                      event.isMetaPressed)) &&
               event.logicalKey.keyLabel.toLowerCase() == 'c';
           if (isCtrlC) {
             if (selectedPaths.isNotEmpty) {
               final sel = selectedPaths.first;
-              if (sel.endsWith('.key') && 
-                  lastSelectedKey != null && 
+              if (sel.endsWith('.key') &&
+                  lastSelectedKey != null &&
                   lastSelectedKey!.isNotEmpty) {
                 Clipboard.setData(ClipboardData(text: lastSelectedKey!));
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(const SnackBar(content: Text('已复制字段名')));
-              } else if (sel.endsWith('.value') && 
-                  lastSelectedValue != null && 
+              } else if (sel.endsWith('.value') &&
+                  lastSelectedValue != null &&
                   lastSelectedValue!.isNotEmpty) {
                 Clipboard.setData(ClipboardData(text: lastSelectedValue!));
                 ScaffoldMessenger.of(
@@ -266,7 +231,7 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
                   path: [],
                   comments: comments,
                   selectedPaths: selectedPaths,
-                  onSelect: 
+                  onSelect:
                       (
                         String pathType,
                         String keyName,
