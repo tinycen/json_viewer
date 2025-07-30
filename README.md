@@ -133,6 +133,7 @@ set FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
   ```bash
   flutter build windows
   ```
+  Note: The built application will be in the `build\windows\runner\Release` directory.
 - For other platforms, use the corresponding Flutter build command (e.g., `flutter build macos`, `flutter build apk`, etc.)
 
 ## Screenshots
