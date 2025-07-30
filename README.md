@@ -74,9 +74,17 @@ set FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
    ```
 
 ### Running the App
-- **Debug mode:**
+- **Analyze App :**
+   ```bash
+   flutter analyze
+   ```
+- **Debug mode choose platform :**
   ```bash
   flutter run -v
+  ```
+- **Debug mode for Windows :**
+  ```bash
+  flutter run -d windows
   ```
 - **Build for Windows:**
   ```bash
