@@ -5,8 +5,8 @@ class JsonCompressor {
   /// 压缩JSON数据
   static dynamic compressJson(dynamic data) {
     if (data is String) {
-      if (data.length > 10) {
-        return data.substring(0, 10) + '...';
+      if (data.length > 20) {
+        return data.substring(0, 20) + '...';
       }
       return data;
     } else if (data is List) {
@@ -19,12 +19,8 @@ class JsonCompressor {
       return data.map((item) => compressJson(item)).toList();
     } else if (data is Map) {
       final compressedMap = <String, dynamic>{};
-      int count = 0;
       data.forEach((key, value) {
-        if (count < 2) {
-          compressedMap[key] = compressJson(value);
-          count++;
-        }
+        compressedMap[key] = compressJson(value);
       });
       return compressedMap;
     }
@@ -32,7 +28,10 @@ class JsonCompressor {
   }
 
   /// 保存压缩后的JSON文件
-  static Future<String?> saveCompressedFile(String filePath, dynamic jsonData) async {
+  static Future<String?> saveCompressedFile(
+    String filePath,
+    dynamic jsonData,
+  ) async {
     try {
       final compressedData = compressJson(jsonData);
       final jsonString = jsonEncode(compressedData);
@@ -43,7 +42,8 @@ class JsonCompressor {
           .lastWhere((segment) => segment.contains('.'))
           .split('.')
           .first;
-      final newPath = '${directory.path}${Platform.pathSeparator}${nameWithoutExtension}_compressed.json';
+      final newPath =
+          '${directory.path}${Platform.pathSeparator}${nameWithoutExtension}_compressed.json';
 
       final newFile = File(newPath);
       await newFile.writeAsString(jsonString);
