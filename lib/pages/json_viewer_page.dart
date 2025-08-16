@@ -24,7 +24,7 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   Set<String> selectedPaths = {};
   String? lastSelectedKey;
   String? lastSelectedValue;
-  bool isTreeView = true; // 控制视图模式
+  bool isTreeView = false; // 控制视图模式，默认为JSON视图
 
   @override
   void initState() {
@@ -158,9 +158,160 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
     }
   }
 
+  List<TextSpan> _parseJsonToSpans(String jsonString) {
+    final spans = <TextSpan>[];
+    final lines = jsonString.split('\n');
+    
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final colonIndex = line.indexOf(':');
+      
+      if (colonIndex != -1) {
+        // 有冒号的行，分别处理key和value
+        final beforeColon = line.substring(0, colonIndex);
+        final colon = ':';
+        final afterColon = line.substring(colonIndex + 1);
+        
+        // 处理key部分（引号内的文本用蓝色）
+        final keyMatch = RegExp(r'"([^"\\]|\\.)*"').firstMatch(beforeColon);
+        if (keyMatch != null) {
+          // key前的空格和结构字符
+          spans.add(TextSpan(
+            text: beforeColon.substring(0, keyMatch.start),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+          
+          // key（蓝色）
+          spans.add(TextSpan(
+            text: keyMatch.group(0),
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.blue[700],
+              fontWeight: FontWeight.w600,
+            ),
+          ));
+          
+          // key后到冒号前的部分
+          spans.add(TextSpan(
+            text: beforeColon.substring(keyMatch.end),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+        } else {
+          spans.add(TextSpan(
+            text: beforeColon,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+        }
+        
+        // 冒号
+        spans.add(TextSpan(
+          text: colon,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ));
+        
+        // 处理value部分（引号内的文本用绿色）
+        final valueMatch = RegExp(r'"([^"\\]|\\.)*"').firstMatch(afterColon);
+        if (valueMatch != null) {
+          // value前的空格
+          spans.add(TextSpan(
+            text: afterColon.substring(0, valueMatch.start),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+          
+          // value（绿色）
+          spans.add(TextSpan(
+            text: valueMatch.group(0),
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.green[700],
+            ),
+          ));
+          
+          // value后的部分
+          spans.add(TextSpan(
+            text: afterColon.substring(valueMatch.end),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+        } else {
+          // 非字符串value（数字、布尔值等）
+          spans.add(TextSpan(
+            text: afterColon,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ));
+        }
+      } else {
+        // 没有冒号的行（结构字符）
+        spans.add(TextSpan(
+          text: line,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ));
+      }
+      
+      // 添加换行符（除了最后一行）
+      if (i < lines.length - 1) {
+        spans.add(const TextSpan(
+          text: '\n',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ));
+      }
+    }
+    
+    return spans;
+  }
+
   Widget _buildJsonTextView() {
     final encoder = JsonEncoder.withIndent('  '); // 2个空格缩进
     final jsonString = encoder.convert(jsonData);
+    final spans = _parseJsonToSpans(jsonString);
     
     return Container(
       width: double.infinity,
@@ -170,13 +321,8 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[300]!),
       ),
-      child: SelectableText(
-        jsonString,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 14,
-          height: 1.4,
-        ),
+      child: SelectableText.rich(
+        TextSpan(children: spans),
       ),
     );
   }
