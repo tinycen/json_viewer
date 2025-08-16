@@ -24,6 +24,7 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
   Set<String> selectedPaths = {};
   String? lastSelectedKey;
   String? lastSelectedValue;
+  bool isTreeView = true; // 控制视图模式
 
   @override
   void initState() {
@@ -157,6 +158,29 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
     }
   }
 
+  Widget _buildJsonTextView() {
+    final encoder = JsonEncoder.withIndent('  '); // 2个空格缩进
+    final jsonString = encoder.convert(jsonData);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: SelectableText(
+        jsonString,
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 14,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RawKeyboardListener(
@@ -216,6 +240,15 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
               tooltip: '打开 JSON 文件',
             ),
             IconButton(
+              icon: Icon(isTreeView ? Icons.code : Icons.account_tree),
+              onPressed: jsonData == null ? null : () {
+                setState(() {
+                  isTreeView = !isTreeView;
+                });
+              },
+              tooltip: isTreeView ? '切换到 JSON 视图' : '切换到树形视图',
+            ),
+            IconButton(
               icon: const Icon(Icons.compress),
               onPressed: jsonData == null ? null : _saveCompressedFile,
               tooltip: '压缩并保存 JSON 文件',
@@ -226,49 +259,51 @@ class _JsonViewerPageState extends State<JsonViewerPage> {
             ? const Center(child: Text('未加载 JSON 文件'))
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: JsonTreeView(
-                  data: jsonData,
-                  path: [],
-                  comments: comments,
-                  selectedPaths: selectedPaths,
-                  onSelect:
-                      (
-                        String pathType,
-                        String keyName,
-                        String? valueStr,
-                        bool isKey,
-                      ) {
-                        setState(() {
-                          if (selectedPaths.contains(pathType)) {
-                            selectedPaths.remove(pathType);
-                            if (isKey) {
-                              lastSelectedKey = null;
-                            } else {
-                              lastSelectedValue = null;
-                            }
-                          } else {
-                            selectedPaths.clear();
-                            selectedPaths.add(pathType);
-                            if (isKey) {
-                              lastSelectedKey = keyName;
-                              lastSelectedValue = null;
-                            } else {
-                              lastSelectedValue = valueStr;
-                              lastSelectedKey = null;
-                            }
-                          }
-                        });
-                      },
-                  onCopyPath: (String pythonPath) async {
-                    await Clipboard.setData(ClipboardData(text: pythonPath));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已复制 Python 路径')),
-                    );
-                  },
-                  onAddComment: (String yamlPath) async {
-                    await _showAddCommentDialog(context, yamlPath);
-                  },
-                ),
+                child: isTreeView
+                    ? JsonTreeView(
+                        data: jsonData,
+                        path: [],
+                        comments: comments,
+                        selectedPaths: selectedPaths,
+                        onSelect:
+                            (
+                              String pathType,
+                              String keyName,
+                              String? valueStr,
+                              bool isKey,
+                            ) {
+                              setState(() {
+                                if (selectedPaths.contains(pathType)) {
+                                  selectedPaths.remove(pathType);
+                                  if (isKey) {
+                                    lastSelectedKey = null;
+                                  } else {
+                                    lastSelectedValue = null;
+                                  }
+                                } else {
+                                  selectedPaths.clear();
+                                  selectedPaths.add(pathType);
+                                  if (isKey) {
+                                    lastSelectedKey = keyName;
+                                    lastSelectedValue = null;
+                                  } else {
+                                    lastSelectedValue = valueStr;
+                                    lastSelectedKey = null;
+                                  }
+                                }
+                              });
+                            },
+                        onCopyPath: (String pythonPath) async {
+                          await Clipboard.setData(ClipboardData(text: pythonPath));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已复制 Python 路径')),
+                          );
+                        },
+                        onAddComment: (String yamlPath) async {
+                          await _showAddCommentDialog(context, yamlPath);
+                        },
+                      )
+                    : _buildJsonTextView(),
               ),
       ),
     );
