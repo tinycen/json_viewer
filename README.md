@@ -61,8 +61,6 @@ Before you build the app, make sure your environment meets the following require
 - **Flutter**: 3.32.5 (Channel stable)
 - **Dart**: 3.8.1
 - **Visual Studio**: installer for the "Desktop development with C++" workload
-- **Windows Version**: Windows 11 64-bit, 23H2, 2009
-- **VS Code**: 1.101.2 (optional, for code editing)
 
 You can check your environment by running:
 
